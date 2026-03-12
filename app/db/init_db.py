@@ -20,7 +20,7 @@ from app.models import (  # noqa: F401
 
 async def init_db() -> None:
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn))
         # Add role column to users if missing (e.g. existing DB before admin feature)
         try:
             await conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'"))

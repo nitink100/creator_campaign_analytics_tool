@@ -31,25 +31,33 @@ async def cleanup_stale_runs():
     from app.core.enums import IngestionStatusEnum
     from app.utils.datetime_utils import utc_now
     from sqlalchemy import update
+    from sqlalchemy.exc import ProgrammingError
     from datetime import timedelta
 
     cutoff = utc_now() - timedelta(minutes=30)
-    async with AsyncSessionLocal() as session:
-        stmt = (
-            update(IngestionRun)
-            .where(
-                IngestionRun.status.in_([IngestionStatusEnum.PENDING.value, IngestionStatusEnum.RUNNING.value]),
-                IngestionRun.started_at < cutoff
+    try:
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                update(IngestionRun)
+                .where(
+                    IngestionRun.status.in_([IngestionStatusEnum.PENDING.value, IngestionStatusEnum.RUNNING.value]),
+                    IngestionRun.started_at < cutoff
+                )
+                .values(
+                    status=IngestionStatusEnum.FAILED.value,
+                    finished_at=utc_now(),
+                    error_summary="Stale run cleaned up on startup (Ghost Run)"
+                )
             )
-            .values(
-                status=IngestionStatusEnum.FAILED.value,
-                finished_at=utc_now(),
-                error_summary="Stale run cleaned up on startup (Ghost Run)"
-            )
-        )
-        await session.execute(stmt)
-        await session.commit()
-        print("--- Stale Ingestion Runs Cleaned Up ---")
+            await session.execute(stmt)
+            await session.commit()
+            print("--- Stale Ingestion Runs Cleaned Up ---")
+    except ProgrammingError as e:
+        err_msg = str(e.orig) if hasattr(e, "orig") and e.orig else str(e)
+        if "does not exist" in err_msg:
+            logger.warning("Skipping stale run cleanup: table not found (e.g. fresh DB). %s", err_msg)
+        else:
+            raise
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
