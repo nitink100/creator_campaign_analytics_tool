@@ -4,6 +4,7 @@ sqlalchemy
 aiosqlite
 pydantic
 pydantic-settings
+email-validator
 httpx
 apscheduler
 passlib[bcrypt]
