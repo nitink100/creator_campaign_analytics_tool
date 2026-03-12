@@ -54,6 +54,47 @@ Visit `http://localhost:3000` to see the dashboard.
   `celery -A app.core.celery_app worker -l info`  
   Use the same `DATABASE_URL` and `YOUTUBE_API_KEY` as the API so the worker commits run status to the same DB.
 
+### 5. Run with Docker Compose (backend + Celery worker + Redis)
+
+One image is used for both the API and the Celery worker; the worker runs as a **separate container** (background worker).
+
+```bash
+# From repo root
+cp .env.example .env   # set YOUTUBE_API_KEY if you have it
+docker compose up --build
+```
+
+- **backend**: FastAPI at `http://localhost:8000`
+- **celery-worker**: Celery worker (same image, `celery -A app.core.celery_app worker -l info`)
+- **redis**: Redis at `localhost:6379`
+
+Web and worker share the same SQLite DB via a volume (`app-db`). To run only the API (no worker): `docker compose up backend redis`.
+
+---
+
+## 🚀 Deploy on Render (backend + Celery + Redis + Postgres)
+
+The repo includes a **Render Blueprint** (`render.yaml`) that deploys:
+
+- **Web**: FastAPI (Docker)
+- **Worker**: Celery (same Docker image, separate service)
+- **Redis**: Render Key Value (separate service; Celery broker/backend)
+- **PostgreSQL**: Render Postgres (separate database)
+
+**Best practice:** Web, worker, Redis, and DB each run as their own service so you can scale and debug independently.
+
+### Steps
+
+1. Push this repo to GitHub and connect it to [Render](https://render.com).
+2. Create a **New Blueprint Instance** and point it at this repo. Render will create the database, Redis, web service, and worker from `render.yaml`.
+3. Set **YOUTUBE_API_KEY** on both the web and worker services (Dashboard → each service → Environment).
+4. **SECRET_KEY**: The web service gets an auto-generated one. Copy that value and set the same **SECRET_KEY** on the worker service (or use a Render [Environment Group](https://render.com/docs/environment-groups) and attach it to both).
+5. Your API URL will be `https://creatorcampaign-api.onrender.com` (or the name you give it). Point your frontend (e.g. Vercel) at this URL for the API.
+
+### Optional: REDIS_URL
+
+The app uses **REDIS_URL** when set (for Celery broker and result backend). The blueprint wires Render’s Redis to **REDIS_URL** automatically. Locally you can set `REDIS_URL` or `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` in `.env`.
+
 ---
 
 ## 📊 Data Sources & Tradeoffs

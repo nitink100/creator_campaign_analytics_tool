@@ -12,6 +12,8 @@ from app.core.config import get_settings
 def build_async_db_url(db_url: str) -> str:
     if db_url.startswith("sqlite:///"):
         return db_url.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
+    if db_url.startswith("postgresql://"):
+        return db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return db_url
 
 
@@ -20,11 +22,15 @@ ASYNC_DATABASE_URL = build_async_db_url(settings.DATABASE_URL)
 
 from sqlalchemy import event
 
+_connect_args = {}
+if "sqlite" in ASYNC_DATABASE_URL:
+    _connect_args["timeout"] = 15
+
 engine = create_async_engine(
     ASYNC_DATABASE_URL,
     echo=False,
     future=True,
-    connect_args={"timeout": 15},  # increase sqlite lock timeout
+    connect_args=_connect_args if _connect_args else {},
 )
 
 @event.listens_for(engine.sync_engine, "connect")

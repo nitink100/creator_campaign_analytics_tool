@@ -55,9 +55,6 @@ export default function CreatorLeaderboard({ refreshKey, onFullRefresh, timePeri
     const debouncedSearch = useDebounce(search, 300);
 
     const fetchData = useCallback(async () => {
-        // #region agent log
-        fetch('http://127.0.0.1:7934/ingest/fb7b0f39-032a-4435-981a-b7522be67869',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bfc2c2'},body:JSON.stringify({sessionId:'bfc2c2',location:'CreatorLeaderboard.jsx:fetchData:start',message:'fetchData started',data:{userId:user?.id},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-        // #endregion
         setLoading(true);
         setError(null);
         try {
@@ -70,9 +67,6 @@ export default function CreatorLeaderboard({ refreshKey, onFullRefresh, timePeri
             setAllItems(items);
             setCampaigns(campaignData || []);
             setSelected(new Set()); // clear selection after refresh
-            // #region agent log
-            fetch('http://127.0.0.1:7934/ingest/fb7b0f39-032a-4435-981a-b7522be67869',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bfc2c2'},body:JSON.stringify({sessionId:'bfc2c2',location:'CreatorLeaderboard.jsx:fetchData',message:'fetchData completed',data:{userId:user?.id,responseCount:items.length},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-            // #endregion
         } catch (err) {
             setError(err.message);
         } finally {

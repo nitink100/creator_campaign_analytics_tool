@@ -86,12 +86,16 @@ class ContentWriteRepo(BaseRepo):
         items_data: list[dict],
     ) -> int:
         """
-        Efficiently upsert multiple content items using SQLite ON CONFLICT.
+        Efficiently upsert multiple content items using ON CONFLICT (SQLite or Postgres).
         """
         if not items_data:
             return 0
 
-        from sqlalchemy.dialects.sqlite import insert
+        dialect_name = self.db.get_bind().dialect.name
+        if dialect_name == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert
+        else:
+            from sqlalchemy.dialects.sqlite import insert
 
         stmt = insert(ContentItem).values(items_data)
         stmt = stmt.on_conflict_do_update(

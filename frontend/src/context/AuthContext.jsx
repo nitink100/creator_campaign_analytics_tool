@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { getToken, setToken as persistToken, setOnUnauthorized } from '../api/client';
+import { getToken, setToken as persistToken, setOnUnauthorized, getApiBase } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
             setInitialized(true);
             return;
         }
-        fetch('/api/auth/me', {
+        fetch(`${getApiBase()}/api/auth/me`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((res) => {
@@ -49,7 +49,7 @@ export function AuthProvider({ children }) {
     }, []);
 
     const login = useCallback(async (email, password, staySignedIn = false) => {
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch(`${getApiBase()}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password, stay_signed_in: staySignedIn }),
@@ -59,7 +59,7 @@ export function AuthProvider({ children }) {
             throw new Error(data.detail || 'Login failed');
         }
         persistToken(data.access_token);
-        const meRes = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${data.access_token}` } });
+        const meRes = await fetch(`${getApiBase()}/api/auth/me`, { headers: { Authorization: `Bearer ${data.access_token}` } });
         const me = await meRes.json();
         if (meRes.ok && me) {
             setUser({ id: me.id, email: me.email, role: me.role || 'user' });
@@ -70,7 +70,7 @@ export function AuthProvider({ children }) {
     }, []);
 
     const signup = useCallback(async (email, password, staySignedIn = false) => {
-        const res = await fetch('/api/auth/signup', {
+        const res = await fetch(`${getApiBase()}/api/auth/signup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password, stay_signed_in: staySignedIn }),
@@ -80,7 +80,7 @@ export function AuthProvider({ children }) {
             throw new Error(data.detail || 'Signup failed');
         }
         persistToken(data.access_token);
-        const meRes = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${data.access_token}` } });
+        const meRes = await fetch(`${getApiBase()}/api/auth/me`, { headers: { Authorization: `Bearer ${data.access_token}` } });
         const me = await meRes.json();
         if (meRes.ok && me) {
             setUser({ id: me.id, email: me.email, role: me.role || 'user' });

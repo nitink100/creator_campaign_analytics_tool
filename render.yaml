@@ -1,0 +1,63 @@
+# Render Blueprint: backend (web + Celery worker), PostgreSQL, Redis (separate services).
+# Best practice: one image for app; web and worker run as separate services; Redis and DB are separate.
+
+databases:
+  - name: creatorcampaign-db
+    databaseName: creatorcampaign
+    user: creatorcampaign
+    plan: free
+
+services:
+  # Redis (Key Value): separate service. Celery broker and result backend use REDIS_URL.
+  - type: redis
+    name: creatorcampaign-redis
+    plan: free
+    maxmemoryPolicy: noeviction
+
+  # Web: FastAPI
+  - type: web
+    name: creatorcampaign-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: creatorcampaign-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: creatorcampaign-redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: APP_ENV
+        value: production
+
+  # Celery worker: same image, different start command; same env as web.
+  - type: worker
+    name: creatorcampaign-celery
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: celery -A app.core.celery_app worker -l info
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: creatorcampaign-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: creatorcampaign-redis
+          property: connectionString
+      # Set SECRET_KEY to the same value as creatorcampaign-api (or use Render Environment Groups).
+      - key: SECRET_KEY
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: APP_ENV
+        value: production

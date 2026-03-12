@@ -1,5 +1,7 @@
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+from pydantic import model_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -22,8 +24,17 @@ class Settings(BaseSettings):
 
     SEED_CHANNEL_IDS_FILE: str = "seed_channels.json"
 
+    # Optional: set REDIS_URL (e.g. from Render) to use for both broker and result backend
+    REDIS_URL: str = ""
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+
+    @model_validator(mode="after")
+    def use_redis_url_if_set(self: "Settings") -> "Settings":
+        if self.REDIS_URL:
+            self.CELERY_BROKER_URL = self.REDIS_URL
+            self.CELERY_RESULT_BACKEND = self.REDIS_URL
+        return self
 
     # Auth (set SECRET_KEY in production)
     SECRET_KEY: str = "dev-secret-change-in-production"

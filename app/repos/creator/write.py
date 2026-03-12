@@ -119,13 +119,17 @@ class CreatorWriteRepo(BaseRepo):
         creators_data: list[dict],
     ) -> int:
         """
-        Efficiently upsert multiple creators using SQLite ON CONFLICT.
+        Efficiently upsert multiple creators using ON CONFLICT (SQLite or Postgres).
         Returns the number of affected rows.
         """
         if not creators_data:
             return 0
 
-        from sqlalchemy.dialects.sqlite import insert
+        dialect_name = self.db.get_bind().dialect.name
+        if dialect_name == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert
+        else:
+            from sqlalchemy.dialects.sqlite import insert
 
         stmt = insert(CreatorProfile).values(creators_data)
         stmt = stmt.on_conflict_do_update(

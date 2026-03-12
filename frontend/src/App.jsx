@@ -13,6 +13,8 @@ import ConfirmModal from './components/ConfirmModal';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import { api } from './api/client';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 export default function App() {
     const { user, initialized, logout } = useAuth();
@@ -235,6 +237,8 @@ export default function App() {
                     onClose={hideModal} 
                 />
             )}
+            <Analytics />
+            <SpeedInsights />
         </>
     );
 }

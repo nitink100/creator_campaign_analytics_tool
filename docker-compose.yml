@@ -1,0 +1,52 @@
+# Local run: backend (FastAPI) + Celery worker (background) + Redis.
+# Same Docker image for web and worker; Celery runs as a separate container.
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - DATABASE_URL=sqlite:///./data/app.db
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=dev-secret-change-in-production
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
+    env_file:
+      - .env
+    volumes:
+      - app-db:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  celery-worker:
+    build: .
+    command: celery -A app.core.celery_app worker -l info
+    environment:
+      - DATABASE_URL=sqlite:///./data/app.db
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=dev-secret-change-in-production
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
+    env_file:
+      - .env
+    volumes:
+      - app-db:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+volumes:
+  app-db:
