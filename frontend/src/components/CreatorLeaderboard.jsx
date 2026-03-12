@@ -144,8 +144,16 @@ export default function CreatorLeaderboard({ refreshKey, onFullRefresh, timePeri
             // This is a quick solution; ideally we'd add platform_creator_id to schema.
 
             // Actually, let me just send the creator_ids and handle it
-            await api.untrackChannels([...selected]);
+            const res = await api.untrackChannels([...selected]);
             if (onFullRefresh) await onFullRefresh();
+            if (res?.message) {
+                showModal({
+                    title: 'Untracked',
+                    message: res.message,
+                    confirmText: 'OK',
+                    hideCancel: true,
+                });
+            }
         } catch (err) {
             setError(err.message);
         } finally {

@@ -340,8 +340,9 @@ async def untrack_channels(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    """Remove channels from this user's tracking (removes user_tracked_creator links only)."""
+    """Remove channels from this user's tracking and from all of their campaigns."""
     from sqlalchemy import delete, select
+    from app.models.campaign import Campaign, CampaignMember
     from app.models.creator_profile import CreatorProfile
     from app.models.user_tracked_creator import UserTrackedCreator
 
@@ -365,11 +366,32 @@ async def untrack_channels(
     )
     result = await db.execute(delete_stmt)
     removed_count = result.rowcount
+
+    # Remove these creators from all of this user's campaigns
+    user_campaign_ids = select(Campaign.id).where(
+        Campaign.user_id == current_user.id,
+        Campaign.deleted_at.is_(None),
+    )
+    delete_members_stmt = delete(CampaignMember).where(
+        CampaignMember.campaign_id.in_(user_campaign_ids),
+        CampaignMember.creator_profile_id.in_(profile_ids),
+    )
+    members_result = await db.execute(delete_members_stmt)
+    campaign_members_removed = members_result.rowcount
+
     await db.commit()
-    logger.info("User %s untracked %d creator(s)", current_user.id, removed_count)
+    logger.info(
+        "User %s untracked %d creator(s), removed from %d campaign membership(s)",
+        current_user.id, removed_count, campaign_members_removed,
+    )
+    message = f"{removed_count} creator(s) untracked"
+    if campaign_members_removed > 0:
+        message += f" and removed from {campaign_members_removed} campaign(s)"
+    message += "."
     return {
         "success": True,
-        "message": f"{removed_count} creator(s) untracked",
+        "message": message,
+        "campaign_members_removed": campaign_members_removed,
     }
 
 
