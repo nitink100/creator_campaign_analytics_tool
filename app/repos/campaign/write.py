@@ -5,11 +5,14 @@ from datetime import datetime
 from sqlalchemy import select, delete, func, desc
 from sqlalchemy.orm import selectinload, aliased
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.logging import get_logger
 from app.models.campaign import Campaign, CampaignMember
 from app.models.content_item import ContentItem
 from app.models.content_metric import ContentMetric
 from app.models.creator_profile import CreatorProfile
 from app.repos.base_repo import BaseRepo
+
+logger = get_logger(__name__)
 
 class CampaignWriteRepo(BaseRepo):
     def __init__(self, db: AsyncSession) -> None:
@@ -24,6 +27,12 @@ class CampaignWriteRepo(BaseRepo):
         start_date: datetime | None = None,
         end_date: datetime | None = None,
     ) -> Campaign:
+        logger.info(
+            "Creating campaign | name=%s user_id=%s budget=%s",
+            name,
+            user_id,
+            budget,
+        )
         campaign = Campaign(
             id=str(uuid.uuid4()),
             user_id=user_id,
@@ -34,6 +43,7 @@ class CampaignWriteRepo(BaseRepo):
             end_date=end_date,
         )
         self.db.add(campaign)
+        logger.info("Campaign created (pending commit) | id=%s user_id=%s", campaign.id, user_id)
         return campaign
 
     async def add_member(self, campaign_id: str, creator_profile_id: str) -> CampaignMember:
@@ -45,6 +55,11 @@ class CampaignWriteRepo(BaseRepo):
         result = await self.db.execute(stmt)
         existing = result.scalar_one_or_none()
         if existing:
+            logger.info(
+                "Campaign member already exists | campaign_id=%s creator_profile_id=%s",
+                campaign_id,
+                creator_profile_id,
+            )
             return existing
 
         member = CampaignMember(
@@ -52,6 +67,11 @@ class CampaignWriteRepo(BaseRepo):
             creator_profile_id=creator_profile_id,
         )
         self.db.add(member)
+        logger.info(
+            "Added creator to campaign (pending commit) | campaign_id=%s creator_profile_id=%s",
+            campaign_id,
+            creator_profile_id,
+        )
         return member
 
     async def remove_member(self, campaign_id: str, creator_profile_id: str) -> bool:
@@ -60,7 +80,14 @@ class CampaignWriteRepo(BaseRepo):
             CampaignMember.creator_profile_id == creator_profile_id,
         )
         result = await self.db.execute(stmt)
-        return result.rowcount > 0
+        removed = result.rowcount > 0
+        logger.info(
+            "Removed campaign member | campaign_id=%s creator_profile_id=%s removed=%s",
+            campaign_id,
+            creator_profile_id,
+            removed,
+        )
+        return removed
 
     async def delete_campaign(self, campaign_id: str) -> bool:
         # Soft delete
@@ -69,8 +96,10 @@ class CampaignWriteRepo(BaseRepo):
         result = await self.db.execute(stmt)
         campaign = result.scalar_one_or_none()
         if not campaign:
+            logger.warning("Delete campaign requested but not found | id=%s", campaign_id)
             return False
         campaign.deleted_at = utc_now()
+        logger.info("Campaign soft-deleted (pending commit) | id=%s", campaign_id)
         return True
 
 class CampaignReadRepo(BaseRepo):

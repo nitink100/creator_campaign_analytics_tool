@@ -4,14 +4,41 @@ A lightweight, high-performance analytics platform for brand partnership teams t
 
 ---
 
-## 🏗 Why This Architecture?
+## 🏗 End-to-end architecture (high level)
 
-We built this using a **Modular Adapter Pattern** to ensure the platform is "Ready for Day 2." 
+- **Backend** (`app/`):
+  - FastAPI + async SQLAlchemy + Pydantic-based settings.
+  - Clean layering:
+    - `routes/` expose HTTP endpoints.
+    - `services/` implement orchestration (ingestion, analytics).
+    - `repos/` encapsulate DB reads/writes against normalized models in `models/`.
+  - Ingestion pipeline:
+    - `IngestionOrchestrator` coordinates phases:
+      - Phase 0: fetch from platform adapters (e.g. YouTube).
+      - Phase 1: upsert creators.
+      - Phase 2: upsert content items.
+      - Phase 3: upsert metric snapshots.
+    - Adapters are registered in a central registry so adding a new platform or source type is additive.
 
-- **FastAPI (Python)**: Chosen for its native asynchronous support, which is critical when fetching data from multiple external social APIs simultaneously.
-- **SQLAlchemy (Async)**: Allows us to treat the database as a durable, queryable asset rather than just a JSON dump.
-- **Repository Pattern**: Decouples business logic from raw SQL, making it trivial to switch from SQLite to a production-grade Postgres instance without rewriting services.
-- **Registry Pattern**: Each platform (YouTube, TikTok, etc.) is an "Adapter." Adding a new source requires no changes to the core orchestrator or the UI.
+- **Frontend** (`frontend/`):
+  - React + Vite.
+  - `AuthContext` manages JWT-based auth and session.
+  - A single API client (`src/api/client.js`) centralizes `VITE_API_URL`, error handling, and token injection.
+  - Key flows:
+    - Creator Dashboard / Leaderboard (analytics views).
+    - Channel Discovery & tracking.
+    - Campaign creation and membership management.
+
+- **Infra / workers**:
+  - Local default: SQLite DB (`app.db`), Redis (broker), Celery worker.
+  - Web and worker share the same DB schema; ingestion runs are dispatched via Celery when available, with a background-task fallback if Redis is down.
+
+For deeper details, see:
+
+- Backend architecture: `docs/backend-architecture.md`
+- Frontend architecture: `docs/frontend-architecture.md`
+- DB + worker architecture: `docs/infra-db-worker.md`
+- End-to-end flow and user journey: `docs/overview-e2e.md`
 
 ---
 
@@ -36,7 +63,7 @@ cd CreatorCampaignAnalyticsTool
 python -m venv venv
 source venv/bin/activate  # Mac/Linux
 pip install -r requirements.txt
-cp .env.example .env      # Add your YOUTUBE_API_KEY
+cp .env.example .env      
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -46,7 +73,9 @@ cd frontend
 npm install
 npm run dev
 ```
-Visit `http://localhost:3000` to see the dashboard.
+Visit `http://localhost:5173` to see the dashboard.
+
+By default the backend uses a local SQLite file (`app.db`), so you **do not** need Postgres for local testing.
 
 ### 4. Sync: With or Without Celery
 - **Without Redis/Celery**: Sync Now uses FastAPI BackgroundTasks (same process). No extra setup; sync runs in the background after you click Sync Now.
@@ -60,8 +89,8 @@ One image is used for both the API and the Celery worker; the worker runs as a *
 
 ```bash
 # From repo root
-cp .env.example .env   # set YOUTUBE_API_KEY if you have it
-docker compose up --build
+cp .env.example .env   # set YOUTUBE_API_KEY (and optionally SECRET_KEY)
+docker compose up --build backend redis celery-worker
 ```
 
 - **backend**: FastAPI at `http://localhost:8000`
@@ -72,7 +101,7 @@ Web and worker share the same SQLite DB via a volume (`app-db`). To run only the
 
 ---
 
-## 🚀 Deploy on Render (backend + Celery + Redis + Postgres)
+## 🚀 Optional: Deploy on Render (backend + Celery + Redis + Postgres)
 
 The repo includes a **Render Blueprint** (`render.yaml`) that deploys:
 
@@ -115,8 +144,9 @@ We chose the official API over scraping to ensure long-term stability and respec
 
 ## 🚀 What I'd Build With Another Week
 
-1. **Social Expansion**: Dedicated Adapters for TikTok and Instagram using the same normalized schema.
-2. **Bulk Ingestion**: Refactor the SQL layer to use `INSERT ... ON CONFLICT` for bulk metric updates, reducing sync time by ~80%.
-3. **Campaign Logic**: Allow users to group specific videos into "Campaigns" with aggregated ROI tracking.
-4. **Engagement Alerts**: An automated service that flags "Dead Content" (high views but 0% engagement growth).
-5. **Dockerization**: A `docker-compose.yml` to spin up the entire stack with a single command.
+1. **Social expansion**: Dedicated adapters for TikTok and Instagram using the same normalized schema, so a partnership team can compare creators across platforms in one view.
+2. **Richer bulk ingestion**: Move fully to database-native upserts (`INSERT ... ON CONFLICT` in Postgres, batched merges) and introduce back-pressure controls so we can safely ingest thousands of creators/videos per run.
+3. **Deeper campaign analytics**: Add campaign-level metrics (e.g. reach, engagement, cost-per-view/engagement) by tying creator/content performance to simple spend inputs, plus campaign comparison views.
+4. **Alerting and insights**: Build an “insights” layer that surfaces opinionated signals — e.g. creators whose engagement has dropped X% week-over-week, campaigns with high spend but low lift, or videos that are quietly outperforming a creator’s baseline.
+5. **Production-grade infra**: Swap SQLite for Postgres by default, add environment-specific configs, and ship a one-click cloud deployment (web + worker + Postgres + Redis) with autoscaling workers.
+6. **UX polish and onboarding**: Add an in-app onboarding tour, saved views/filters for power users, and a “sample data” mode so non-technical stakeholders can explore the product without creating a YouTube API key.

@@ -20,7 +20,6 @@ from app.routes.platform import router as platform_router
 from app.routes.admin import router as admin_router
 from app.routes.campaigns import router as campaigns_router
 from app.deps.auth import get_current_user, get_current_admin_user
-from app.core.agent_debug_log import agent_debug_log
 
 logger = get_logger(__name__)
 
@@ -115,17 +114,6 @@ async def pydantic_validation_error_handler(
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    agent_debug_log(
-        run_id="pre-fix-login",
-        hypothesis_id="H2",
-        location="app/main.py:unhandled_exception_handler",
-        message="unhandled_exception",
-        data={
-            "method": request.method,
-            "path": request.url.path,
-            "type": type(exc).__name__,
-        },
-    )
     logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,

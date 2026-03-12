@@ -9,13 +9,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.logging import get_logger
 from app.deps.db import get_db_session
 from app.deps.auth import get_current_user
 from app.models.user import User
 from app.schemas.auth import SignupRequest, LoginRequest, TokenResponse, UserResponse
-from app.core.agent_debug_log import agent_debug_log
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+logger = get_logger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -58,6 +59,7 @@ async def signup(
     role = "user"
     if settings.ADMIN_EMAIL and body.email.lower() == settings.ADMIN_EMAIL.lower():
         role = "admin"
+    logger.info("Signup requested for email=%s", body.email.lower())
     user = User(
         email=body.email.lower(),
         hashed_password=_hash_password(body.password),
@@ -67,6 +69,7 @@ async def signup(
     await db.commit()
     await db.refresh(user)
     access_token = _create_access_token(user.id, stay_signed_in=body.stay_signed_in)
+    logger.info("Signup succeeded for user_id=%s email=%s role=%s", user.id, user.email, user.role)
     return TokenResponse(access_token=access_token)
 
 
@@ -75,24 +78,17 @@ async def login(
     body: LoginRequest,
     db: AsyncSession = Depends(get_db_session),
 ) -> TokenResponse:
-    agent_debug_log(
-        run_id="pre-fix-login",
-        hypothesis_id="H1",
-        location="app/routes/auth.py:login",
-        message="login_called",
-        data={
-            "has_email": bool(body.email),
-            "stay_signed_in": bool(body.stay_signed_in),
-        },
-    )
+    logger.info("Login requested for email=%s", body.email.lower())
     result = await db.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
     if not user or not _verify_password(body.password, user.hashed_password):
+        logger.warning("Login failed for email=%s", body.email.lower())
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
         )
     access_token = _create_access_token(user.id, stay_signed_in=body.stay_signed_in)
+    logger.info("Login succeeded for user_id=%s email=%s", user.id, user.email)
     return TokenResponse(access_token=access_token)
 
 

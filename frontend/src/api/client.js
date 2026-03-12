@@ -1,7 +1,6 @@
-// In production (e.g. Vercel), set VITE_API_URL to your backend (e.g. https://your-api.onrender.com)
 const BASE = typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL
     ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
-    : '';
+    : 'http://localhost:8000';
 
 export function getApiBase() {
     return BASE;
