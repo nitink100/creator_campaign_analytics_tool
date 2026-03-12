@@ -13,6 +13,7 @@ from app.deps.db import get_db_session
 from app.deps.auth import get_current_user
 from app.models.user import User
 from app.schemas.auth import SignupRequest, LoginRequest, TokenResponse, UserResponse
+from app.core.agent_debug_log import agent_debug_log
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -74,6 +75,16 @@ async def login(
     body: LoginRequest,
     db: AsyncSession = Depends(get_db_session),
 ) -> TokenResponse:
+    agent_debug_log(
+        run_id="pre-fix-login",
+        hypothesis_id="H1",
+        location="app/routes/auth.py:login",
+        message="login_called",
+        data={
+            "has_email": bool(body.email),
+            "stay_signed_in": bool(body.stay_signed_in),
+        },
+    )
     result = await db.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
     if not user or not _verify_password(body.password, user.hashed_password):

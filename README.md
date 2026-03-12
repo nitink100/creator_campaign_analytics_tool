@@ -95,6 +95,8 @@ The repo includes a **Render Blueprint** (`render.yaml`) that deploys:
 
 The app uses **REDIS_URL** when set (for Celery broker and result backend). The blueprint wires Render’s Redis to **REDIS_URL** automatically. Locally you can set `REDIS_URL` or `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` in `.env`.
 
+**Already have Web + Postgres?** To add Redis and the Celery worker only, see [docs/RENDER_CELERY_REDIS.md](docs/RENDER_CELERY_REDIS.md).
+
 ---
 
 ## 📊 Data Sources & Tradeoffs
